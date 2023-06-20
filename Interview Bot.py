@@ -6,18 +6,89 @@ import matplotlib.pyplot as plt
 import csv
 import threading
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import sounddevice as sd
+import soundfile as sf
+import cv2
+import requests
 
+sample_rate = 44100 
+duration = 5
+file=1 
+files=1
 z=0
 y = 'M'
 question_label = None
-num=1
+num=4
 text='CLICK ON READY TO START YOUR PRACTICE INTERVIEW SESSION'
 xrange = []
 below50 = 0
 above50 = 0
 equal0 = 0
+                
+def record_video():
+    global z,files
+    output_file=f'videos\question{files}.avi'
+    cap = cv2.VideoCapture(0)
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    out = cv2.VideoWriter(output_file, fourcc, 20.0, (640, 480))
+    files+=1
+
+    while True:
+        ret, frame = cap.read()
+
+        if ret:
+            cv2.imshow('Recording', frame)
+            out.write(frame)
+
+            if cv2.waitKey(1) == ord('q'):
+                break
+            if z==num:
+                break
+        else:
+            break
+
+    cap.release()
+    out.release()
+    cv2.destroyAllWindows()
+
+def record_audio():
+    global sample_rate,duration,file
+    output_file=f'recording\question{file}.wav'
+    audio1 = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=1)
+    sd.wait()
+    sf.write(output_file, audio1, sample_rate)
+    file+=1
+    
+def text_audio(): 
+    global answer,recognizer
+    with sr.Microphone() as source:
+        audio = recognizer.listen(source, phrase_time_limit=5)
+        
+ 
+    try:
+        answer = recognizer.recognize_google(audio)
+        answer = answer.lower()
+        print("Your answer is:", answer)
+    except sr.UnknownValueError:
+        answer = 'dont know'
+        print("It's ok try your best in your next answer")
+        Speak("It's ok try your best in your next answer")
+        
+        
+def audio_thread():
+    global output_file,thread6
+    thread4 = threading.Thread(target=record_audio)
+    thread5 = threading.Thread(target=text_audio)
+    thread4.start()
+    thread5.start()
+    thread4.join()
+    thread5.join()
+   
+    
+    
+
 def question_input():
-    global y,num,xrange,ques,y_pos, corr,z,below50,above50,equal0
+    global y,num,xrange,ques,y_pos, corr,z,below50,above50,equal0,answer,recognizer
     questions = []
     keywords = []
     ques = []
@@ -49,24 +120,14 @@ def question_input():
         print(keyword)
         print("What is your answer to the question?")
         Speak("What is your answer to the question?")
-        with sr.Microphone() as source:
-            audio = recognizer.listen(source, phrase_time_limit=5)
-     
-        try:
-            answer = recognizer.recognize_google(audio)
-            answer = answer.lower()
-            print("Your answer is:", answer)
-        except sr.UnknownValueError:
-            answer = 'dont know'
-            print("It's ok try your best in your next answer")
-            Speak("It's ok try your best in your next answer")
+       
+        audio_thread()
         
         keyword_list = keyword.split(',')
         matches = []
         match_count = 0
         
         for i in keyword_list:
-            i = i.strip()
             keyword_list2.append(i)
             if i in answer:
                 matches.append(i)
@@ -129,6 +190,7 @@ def question1():
     
     thread = threading.Thread(target=question_input)
     thread.start()
+    thread.join()
 
 def Speak(audio):
     engine = pyttsx3.init('sapi5')
@@ -191,7 +253,6 @@ def clear_graph():
         del canvas1
         
 
-answers = []
 screen = Tk()
 screen.title("Interview Bot")
 screen.geometry("1200x650")
@@ -199,13 +260,15 @@ bg = PhotoImage(file="interview1.png")
 
 label1 = Label(screen, image=bg)
 label1.place(x=0, y=0, width=1200, height=650)
+
 def thread_start():
-    
+    global output_file
     thread3 = threading.Thread(target=question1)
-    
+    thread6 = threading.Thread(target=record_video)
     thread2 = threading.Thread(target=clear_graph)
     thread2.start()
     thread3.start()
+    thread6.start()
     
 
 
